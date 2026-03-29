@@ -569,8 +569,23 @@
     <li><strong>This experiment was independent of the SAE/probe work.</strong> The SD dose-response was designed based on biological reasoning about ribosome dynamics, not from SAE features or NTv3 predictions. It's a clean biology experiment that stands on its own. The SAE features helped identify that NTv3 tracks SD motifs internally (16 features overlap between "expression-predictive" and "SD-tracking" feature sets, p = 1.1 &times; 10<sup>-16</sup>), but a biologist could have designed this experiment without any AI.</li>
   </ol>
 
+  <h4>What the literature says (and doesn't)</h4>
+
+  <p>The effect of internal SD motifs on expression is the subject of an <strong>active scientific debate</strong>. The landmark paper by <strong>Li, Oh &amp; Weissman (2012, <em>Nature</em>)</strong> used ribosome profiling in E. coli to show that SD-like hexamers within coding sequences cause pervasive translational pausing, with ~70% of strong pauses associated with internal SD motifs. However, <strong>Mohammad et al. (2019, <em>eLife</em>)</strong> substantially challenged this finding, showing that Li et al.'s protocol selectively isolated long ribosome-protected fragments, and that SD-like sequences produce longer footprints due to extra 16S rRNA protection &mdash; creating a <strong>sampling artifact</strong>. In libraries capturing the full distribution of footprint sizes, no SD-induced pauses were observed.</p>
+
+  <p>What <em>is</em> well-established is the <strong>genomic signature</strong>: highly expressed genes contain fewer internal SD motifs than expected (<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC5100845/" style="color:var(--accent-blue)">Yang et al. 2016, <em>G3</em></a>; analysis of 187 bacterial genomes, p &lt; 10<sup>-18</sup>). But whether this depletion is due to pausing, aberrant internal initiation, or some other mechanism remains unresolved.</p>
+
+  <p>Our literature review found three gaps our experiment addresses:</p>
+  <ul>
+    <li><strong>No prior study has varied SD count while holding CAI constant.</strong> In natural genomes, high CAI and low SD always co-occur. Ours is the first controlled deconfounding.</li>
+    <li><strong>No prior study has tested internal SD effects in a cell-free (PURE-like) system.</strong> All prior work is in vivo, where transcription-translation coupling, mRNA degradation, and ribosome competition add confounds.</li>
+    <li><strong>No prior study has reported a non-monotonic / U-shaped SD dose-response.</strong> All published relationships are monotonically negative or binary (SD present vs. absent).</li>
+  </ul>
+
+  <p>Our cell-free result is relevant to the Li vs. Mohammad debate: if internal SDs reduce expression in a reconstituted system (where many in-vivo confounds are absent), that provides independent evidence the effect is real and not purely a ribosome profiling artifact. The 31% drop from SD-09 to SD-17 at matched CAI supports a genuine functional effect of internal SD motifs on translation.</p>
+
   <div class="callout">
-    <p><strong>Honest note:</strong> With only 5 data points, we cannot definitively distinguish a U-shape from noise around a weak downward trend. The non-monotonic pattern is reproducible within each construct's 12 replicates (tight CVs), but fitting a curve to 5 points is inherently fragile. A follow-up with 15&ndash;20 SD levels and finer spacing would be needed to confirm the U-shape and map the biology in detail.</p>
+    <p><strong>Honest note:</strong> With only 5 data points, we cannot definitively distinguish a U-shape from noise around a weak downward trend. The non-monotonic pattern is reproducible within each construct's 12 replicates (tight CVs), but fitting a curve to 5 points is inherently fragile. A follow-up with 15&ndash;20 SD levels and finer spacing would be needed to confirm the U-shape and map the biology in detail. The 31% drop from 9 to 17 SDs is the robust finding; the recovery at 25 SDs is intriguing but needs replication.</p>
   </div>
 
   <h3>5e. Random Baselines</h3>
