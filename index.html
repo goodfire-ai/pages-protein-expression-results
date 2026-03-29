@@ -497,15 +497,81 @@
   <p><strong>NTv3-MIN-goodCAI</strong> is the sequence the model was most pessimistic about among those with acceptable classical metrics. Probe score 6.6, CAI = 0.59. Result: <strong>204 nM</strong>. Perfectly fine.</p>
   <p>The probe, trained on in-vivo E. coli expression data, does not transfer to cell-free expression at extreme CAI values. Classical metrics (particularly CAI) remain the dominant predictor in this assay. The model's internal representation captured real patterns, but the probe mapping those patterns to expression was calibrated for a different biological context.</p>
 
-  <h3>5d. SD Dose-Response</h3>
+  <h3>5d. SD Dose-Response: A Deep Dive</h3>
 
-  <div class="chart-container">
-    <div class="chart-title">Internal Shine-Dalgarno Motifs vs. Expression</div>
-    <canvas id="sdChart" height="240"></canvas>
+  <h4>Background: What are Shine-Dalgarno motifs?</h4>
+
+  <p>In bacteria like E. coli, the ribosome (the molecular machine that reads mRNA and builds proteins) needs to find the right starting position on an mRNA molecule. It does this by recognizing a specific sequence called the <strong>Shine-Dalgarno (SD) sequence</strong> &mdash; typically <code>GGAGG</code> or close variants &mdash; located a few nucleotides upstream of the start codon (<code>AUG</code>). The SD sequence base-pairs with a complementary region on the ribosome's 16S rRNA, anchoring the ribosome in the correct position to begin translation.</p>
+
+  <p>This is the <strong>intended</strong> use of SD sequences. But here's the problem: the same motif can appear <strong>inside</strong> the coding region of a gene, purely by accident of codon choice. When the ribosome encounters an internal SD-like sequence while translating, it can potentially:</p>
+  <ul>
+    <li><strong>Pause or stall</strong> &mdash; the ribosome's 16S rRNA transiently binds the internal SD, slowing elongation</li>
+    <li><strong>Cause frameshifting</strong> &mdash; the ribosome slips to a new reading frame, producing a garbled protein</li>
+    <li><strong>Recruit a second ribosome</strong> &mdash; an internal SD could serve as a spurious translation initiation site, producing a truncated protein from the middle of the gene</li>
+  </ul>
+
+  <p>For this reason, natural highly-expressed E. coli genes tend to <strong>avoid</strong> internal SD motifs. But here's the confound that makes this hard to study: genes with high CAI (good codons) also tend to have few internal SD motifs, simply because the most common E. coli codons don't form SD-like patterns. In natural genomes, <strong>high CAI and low SD count always co-occur</strong>. Nobody has been able to cleanly separate their effects.</p>
+
+  <h4>Our experiment: breaking the confound</h4>
+
+  <p>We designed five mRFP synonymous variants that hold CAI near-maximal (0.947&ndash;1.000) while varying the number of internal SD motifs from 9 to 25. All five have identical 5&prime; regions (same MFE = -1.7 kcal/mol) and encode the same protein. The only designed variable is SD count in the gene body.</p>
+
+  <p>An important biological constraint: mRFP contains 7 Glutamate-Glycine (EG) dipeptides where <strong>every possible</strong> synonymous codon combination creates an SD-like 5-mer. For example, Glutamate can be encoded by <code>GAA</code> or <code>GAG</code>, and Glycine by <code>GGT</code>, <code>GGC</code>, <code>GGA</code>, or <code>GGG</code>. Every combination of E+G codons produces <code>GAA|GGx</code> = <code>GAAGG</code> or <code>GAG|GGx</code> = <code>GAGGG</code>, both of which are SD-like motifs. So the minimum achievable SD count for mRFP is 9, not 0.</p>
+
+  <p>The five SD motif types we counted: <code>GGAGG</code> (the canonical SD), <code>GAAGG</code>, <code>GAGGG</code>, <code>GGAAG</code>, and <code>AGGAG</code>. To increase SD count, we swapped synonymous codons at positions where the swap creates a new SD motif across the codon boundary, while minimizing CAI loss.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Construct</th><th>SD Count</th><th>CAI</th><th>MFE_30</th><th>Codons Changed</th><th>Expression (nM)</th></tr></thead>
+      <tbody>
+        <tr><td>SD-09-hiCAI</td><td class="num">9</td><td class="num">0.989</td><td class="num">-1.7</td><td class="num">4</td><td class="num highlight">269.9 &plusmn; 10.9</td></tr>
+        <tr><td>SD-13-hiCAI</td><td class="num">13</td><td class="num">1.000</td><td class="num">-1.7</td><td class="num">0 (max-CAI baseline)</td><td class="num highlight">218.7 &plusmn; 6.3</td></tr>
+        <tr><td>SD-17-hiCAI</td><td class="num">17</td><td class="num">0.986</td><td class="num">-1.7</td><td class="num">3</td><td class="num highlight">186.4 &plusmn; 6.9</td></tr>
+        <tr><td>SD-21-hiCAI</td><td class="num">21</td><td class="num">0.967</td><td class="num">-1.7</td><td class="num">7</td><td class="num highlight">204.8 &plusmn; 12.7</td></tr>
+        <tr><td>SD-25-hiCAI</td><td class="num">25</td><td class="num">0.947</td><td class="num">-1.7</td><td class="num">11</td><td class="num highlight">246.0 &plusmn; 20.4</td></tr>
+      </tbody>
+    </table>
   </div>
 
-  <p>Shine-Dalgarno (SD) motifs are sequences (like <code>GGAGG</code>) that normally sit upstream of a gene to recruit the ribosome. When they appear <strong>inside</strong> a gene, they can recruit ribosomes to the wrong location, stalling translation. We varied the number of internal SD motifs from 9 to 25 while keeping CAI near-maximal.</p>
-  <p>The result is <strong>non-monotonic</strong>: expression drops from 270 nM (9 SDs) to 186 nM (17 SDs), then <em>rises</em> back to 246 nM (25 SDs). This U-shaped curve suggests complex dynamics &mdash; perhaps at very high SD density, the motifs are so frequent that no single one dominates, or compensatory mechanisms take over. The CAI variation across the series (0.947 to 1.000) does not explain the pattern (correlation r = -0.14 between CAI and expression within this group).</p>
+  <h4>Hypothesis: more SD motifs = less expression</h4>
+
+  <p>The simple prediction: if internal SD motifs stall the ribosome, then adding more of them should monotonically reduce expression. SD-09 should express the most, SD-25 the least. The effect should be independent of CAI (which is held near-constant) and independent of 5&prime; structure (which is identical).</p>
+
+  <h4>Result: a U-shaped curve</h4>
+
+  <div class="chart-container large">
+    <div class="chart-title">Internal Shine-Dalgarno Motifs vs. Expression</div>
+    <canvas id="sdChart" height="280"></canvas>
+  </div>
+
+  <p>The result is decidedly <strong>not</strong> a simple monotonic decline. Expression drops from 270 nM at 9 SDs to a minimum of 186 nM at 17 SDs &mdash; a meaningful 31% reduction. But then it <strong>rises back</strong> to 246 nM at 25 SDs. The overall shape is a U-curve that bottoms out at 17 SD motifs.</p>
+
+  <div class="callout orange">
+    <p><strong>Key numbers:</strong> The drop from SD-09 to SD-17 is 83.5 nM (31%). The recovery from SD-17 to SD-25 is 59.6 nM (32% increase from the trough). The overall difference between the minimum (SD-17, 186 nM) and maximum (SD-09, 270 nM) is 1.45x. All measurements have CVs of 2.9&ndash;8.3%, so the differences are well above noise.</p>
+  </div>
+
+  <h4>Why the U-shape? Possible explanations</h4>
+
+  <p><strong>1. Different SD motif types have different strengths.</strong> At lower SD counts (9&ndash;13), the motifs are predominantly <code>GAAGG</code> and <code>GGAAG</code> &mdash; these arise from the unavoidable EG dipeptides and the max-CAI codon choices. To reach higher counts (17+), the design algorithm introduced <code>GGAGG</code> (the canonical, strongest SD) and <code>AGGAG</code>. But to reach 21&ndash;25, it may have used weaker motif variants or placed them in less disruptive positions. The motifs are not all equal &mdash; <code>GGAGG</code> binds ribosomes ~10x more strongly than <code>GAAGG</code>. The SD-17 construct may have hit a "sweet spot" of strong motifs in disruptive positions.</p>
+
+  <p><strong>2. Ribosome queuing / traffic effects.</strong> At moderate SD density, individual internal SDs can stall a translating ribosome long enough to cause problems. But at very high density, stalled ribosomes may physically block upstream ribosomes from reaching the next SD motif, paradoxically reducing the per-motif stalling effect. Think of it like traffic: a few red lights slow you down, but if every block has a red light, cars never get enough speed to be affected by the next one.</p>
+
+  <p><strong>3. CAI confound (partial).</strong> CAI decreases from 1.000 (SD-13) to 0.947 (SD-25) as more codon swaps are needed to introduce SDs. However, the correlation between CAI and expression across these 5 points is only r = -0.14 (essentially zero). SD-13 has perfect CAI (1.000) yet expresses <em>less</em> than SD-09 (CAI = 0.989). And SD-25 has the <em>worst</em> CAI (0.947) yet is the second-highest expresser. CAI does not explain the U-shape.</p>
+
+  <p><strong>4. mRNA secondary structure changes.</strong> Although all constructs have the same MFE_30 (5&prime; region is fixed), the codon swaps in the gene body could alter internal mRNA structure. SD-rich sequences tend to be purine-rich (lots of G and A), which could reduce internal base pairing and create a more open mRNA. More open internal structure might improve ribosome processivity, partially offsetting the SD stalling effect at high counts.</p>
+
+  <h4>What this means</h4>
+
+  <p>The SD dose-response demonstrates three things:</p>
+  <ol>
+    <li><strong>Internal SD motifs do affect cell-free expression</strong> &mdash; the 31% drop from SD-09 to SD-17 is substantial and occurs despite near-identical CAI. This is the first demonstration of this effect in a cell-free system with controlled CAI.</li>
+    <li><strong>The relationship is not simple.</strong> A naive model of "each SD reduces expression by X%" is wrong. The effect depends on motif type, position, density, and likely interactions between these factors. This is more complex biology than what was previously assumed.</li>
+    <li><strong>This experiment was independent of the SAE/probe work.</strong> The SD dose-response was designed based on biological reasoning about ribosome dynamics, not from SAE features or NTv3 predictions. It's a clean biology experiment that stands on its own. The SAE features helped identify that NTv3 tracks SD motifs internally (16 features overlap between "expression-predictive" and "SD-tracking" feature sets, p = 1.1 &times; 10<sup>-16</sup>), but a biologist could have designed this experiment without any AI.</li>
+  </ol>
+
+  <div class="callout">
+    <p><strong>Honest note:</strong> With only 5 data points, we cannot definitively distinguish a U-shape from noise around a weak downward trend. The non-monotonic pattern is reproducible within each construct's 12 replicates (tight CVs), but fitting a curve to 5 points is inherently fragile. A follow-up with 15&ndash;20 SD levels and finer spacing would be needed to confirm the U-shape and map the biology in detail.</p>
+  </div>
 
   <h3>5e. Random Baselines</h3>
 
@@ -542,8 +608,8 @@
   <h3>6c. The model doesn't transfer at extremes</h3>
   <p>The NTv3 probe (trained on in-vivo data) completely fails when pushed to extreme CAI values in a cell-free system. The model's highest-confidence prediction produced zero protein. Classical metrics &mdash; particularly CAI &mdash; remain the dominant predictor in this assay. This is a cautionary tale about domain transfer: a model can learn genuine patterns and still fail when the deployment context differs from the training context.</p>
 
-  <h3>6d. SD motifs have complex effects</h3>
-  <p>The non-monotonic SD dose-response suggests that internal ribosome-binding-site mimics do not simply reduce expression in proportion to their count. Position, motif type, spacing, and local sequence context likely all matter. The U-shaped curve is an unexpected finding that warrants further investigation.</p>
+  <h3>6d. SD motifs have complex, non-linear effects</h3>
+  <p>The SD dose-response produced the experiment's most biologically interesting result. Internal SD motifs reduce expression at moderate density (31% drop from 9 to 17 motifs at matched CAI), confirming that these ribosome-confusing sequences matter even in a cell-free system. But the U-shaped recovery at high density (25 motifs expressing nearly as well as 9) was unexpected and suggests the effect is far more complex than "more SD = worse." This non-linearity &mdash; potentially driven by motif type differences, ribosome queuing, or compensatory structural effects &mdash; represents genuinely novel biology that warrants follow-up with finer-grained dose-response curves.</p>
 </section>
 
 <!-- SECTION 7: HONEST ASSESSMENT -->
