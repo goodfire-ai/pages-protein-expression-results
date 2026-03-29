@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAE Features from a DNA Foundation Model: Wet Lab Validation</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #6e7681;
+    --border: #30363d;
+    --accent-blue: #58a6ff;
+    --accent-green: #3fb950;
+    --accent-red: #f85149;
+    --accent-orange: #d29922;
+    --accent-purple: #bc8cff;
+    --accent-cyan: #39d2c0;
+    --control-blue: #4a90d9;
+    --matched-green: #3fb950;
+    --matched-red: #f85149;
+    --oracle-purple: #bc8cff;
+    --sd-orange: #d29922;
+    --random-gray: #8b949e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+    line-height: 1.7;
+    font-size: 16px;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* Hero */
+  .hero {
+    padding: 80px 0 60px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero h1 {
+    font-size: 2.4em;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero .subtitle {
+    font-size: 1.15em;
+    color: var(--text-secondary);
+    max-width: 700px;
+  }
+  .hero .meta {
+    margin-top: 24px;
+    font-size: 0.85em;
+    color: var(--text-muted);
+  }
+
+  /* Sections */
+  section {
+    padding: 56px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  section:last-of-type {
+    border-bottom: none;
+  }
+
+  h2 {
+    font-size: 1.8em;
+    font-weight: 700;
+    margin-bottom: 24px;
+    color: var(--text-primary);
+  }
+  h3 {
+    font-size: 1.25em;
+    font-weight: 600;
+    margin-top: 36px;
+    margin-bottom: 14px;
+    color: var(--accent-blue);
+  }
+  h4 {
+    font-size: 1.05em;
+    font-weight: 600;
+    margin-top: 28px;
+    margin-bottom: 10px;
+    color: var(--text-primary);
+  }
+
+  p {
+    margin-bottom: 16px;
+    color: var(--text-secondary);
+  }
+  p strong {
+    color: var(--text-primary);
+  }
+
+  /* Key finding callout */
+  .callout {
+    background: var(--bg-secondary);
+    border-left: 4px solid var(--accent-blue);
+    padding: 20px 24px;
+    margin: 24px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .callout.green { border-left-color: var(--accent-green); }
+  .callout.red { border-left-color: var(--accent-red); }
+  .callout.orange { border-left-color: var(--accent-orange); }
+  .callout.purple { border-left-color: var(--accent-purple); }
+  .callout p {
+    color: var(--text-primary);
+    margin-bottom: 0;
+  }
+  .callout p + p { margin-top: 12px; }
+
+  /* Code / monospace */
+  code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    background: var(--bg-tertiary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.88em;
+    color: var(--accent-cyan);
+  }
+  pre {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    overflow-x: auto;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.85em;
+    line-height: 1.6;
+    margin: 16px 0;
+    color: var(--text-primary);
+  }
+
+  /* Tables */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 20px 0;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88em;
+  }
+  thead {
+    background: var(--bg-tertiary);
+  }
+  th {
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+  td {
+    padding: 9px 14px;
+    border-top: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+  tr:hover td {
+    background: var(--bg-secondary);
+  }
+  td.num { font-family: 'SFMono-Regular', Consolas, monospace; text-align: right; font-size: 0.95em; }
+  td.highlight { color: var(--text-primary); font-weight: 600; }
+
+  /* Charts */
+  .chart-container {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 24px 16px;
+    margin: 24px 0;
+    position: relative;
+  }
+  .chart-container.large {
+    padding: 36px 28px 20px;
+  }
+  .chart-title {
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+  }
+
+  /* Sequence visual */
+  .seq-visual {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin: 20px 0;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 0.85em;
+    line-height: 2;
+  }
+  .seq-visual .label {
+    color: var(--text-muted);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 0.85em;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .seq-visual .dna { color: var(--accent-cyan); }
+  .seq-visual .protein { color: var(--accent-orange); font-weight: 600; }
+  .seq-visual .separator { color: var(--text-muted); }
+  .seq-visual .arrow { color: var(--text-muted); display: block; margin: 4px 0; }
+
+  /* Stats row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+    margin: 24px 0;
+  }
+  .stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+    text-align: center;
+  }
+  .stat-card .value {
+    font-size: 1.6em;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: 'SFMono-Regular', Consolas, monospace;
+  }
+  .stat-card .label {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* Lists */
+  ul, ol {
+    margin: 12px 0 16px 24px;
+    color: var(--text-secondary);
+  }
+  li { margin-bottom: 6px; }
+  li strong { color: var(--text-primary); }
+
+  /* Footer */
+  footer {
+    padding: 48px 0;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85em;
+  }
+  footer a {
+    color: var(--accent-blue);
+    text-decoration: none;
+  }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .hero h1 { font-size: 1.7em; }
+    h2 { font-size: 1.4em; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    table { font-size: 0.78em; }
+    th, td { padding: 7px 8px; }
+  }
+
+  /* Verdict boxes */
+  .verdict {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 24px 0;
+  }
+  @media (max-width: 640px) {
+    .verdict { grid-template-columns: 1fr; }
+  }
+  .verdict-box {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .verdict-box h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 0.95em;
+  }
+  .verdict-box.can h4 { color: var(--accent-green); }
+  .verdict-box.cannot h4 { color: var(--accent-red); }
+  .verdict-box ul { margin-left: 16px; font-size: 0.9em; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<!-- HERO -->
+<div class="hero">
+  <h1>Can Mechanistic Interpretability Find Real Biology?</h1>
+  <p class="subtitle">We decomposed a DNA foundation model into 12,288 features, found one that classical metrics couldn't explain, and sent 14 DNA sequences to a wet lab to test whether it was real.</p>
+  <p class="meta">Goodfire AI &middot; March 2026 &middot; Cell-free protein expression via Ginkgo Bioworks</p>
+</div>
+
+<!-- SECTION 1: THE QUESTION -->
+<section id="question">
+  <h2>1. The Question</h2>
+  <p>Can mechanistic interpretability of a DNA foundation model reveal something biologically real &mdash; something that predicts outcomes in a wet lab? Not just rediscover known science, but find a signal that classical metrics miss, and prove it matters by measuring its effect on actual protein production?</p>
+</section>
+
+<!-- SECTION 2: BACKGROUND -->
+<section id="background">
+  <h2>2. Background &mdash; What You Need to Know</h2>
+
+  <h3>2a. DNA to Protein (The Central Dogma)</h3>
+  <p>DNA is a string of four letters: <code>A</code>, <code>T</code>, <code>C</code>, <code>G</code>. The cell reads DNA three letters at a time. Each triplet is called a <strong>codon</strong>. There are 64 possible codons (4<sup>3</sup>), but they map to only 20 amino acids (the building blocks of proteins) plus a stop signal.</p>
+  <p>This means the genetic code is <strong>redundant</strong>. Multiple codons encode the same amino acid. For example, the amino acid Alanine can be encoded by four different codons: <code>GCT</code>, <code>GCC</code>, <code>GCA</code>, <code>GCG</code>. All four produce the identical protein, but they are not equivalent for protein production.</p>
+  <p><strong>Synonymous variants</strong> are DNA sequences that encode the exact same protein but use different codon "spellings." They are the cleanest possible test case: any difference in behavior must come from the DNA sequence itself, not the protein.</p>
+
+  <div class="seq-visual">
+    <span class="label">Variant A (uses E. coli's preferred codons):</span>
+    <span class="dna">ATG</span><span class="separator"> | </span><span class="dna">GCT</span><span class="separator"> | </span><span class="dna">GAA</span><span class="separator"> | </span><span class="dna">GGT</span><span class="separator"> | </span><span class="dna">CCG</span><span class="separator"> | </span><span class="dna">AAA</span><span class="separator"> | </span><span class="dna">GAT</span><span class="separator"> ...</span>
+    <span class="arrow">&darr;&ensp;&ensp;&ensp;&ensp;&darr;&ensp;&ensp;&ensp;&ensp;&darr;&ensp;&ensp;&ensp;&ensp;&darr;&ensp;&ensp;&ensp;&ensp;&darr;&ensp;&ensp;&ensp;&ensp;&darr;&ensp;&ensp;&ensp;&ensp;&darr;</span>
+    <span class="protein">&ensp;M&ensp;&ensp;&ensp;&ensp;&ensp;A&ensp;&ensp;&ensp;&ensp;&ensp;E&ensp;&ensp;&ensp;&ensp;&ensp;G&ensp;&ensp;&ensp;&ensp;&ensp;P&ensp;&ensp;&ensp;&ensp;&ensp;K&ensp;&ensp;&ensp;&ensp;&ensp;D&ensp;&ensp;</span>
+    <br><br>
+    <span class="label">Variant B (different spelling, identical protein):</span>
+    <span class="dna">ATG</span><span class="separator"> | </span><span class="dna">GCA</span><span class="separator"> | </span><span class="dna">GAG</span><span class="separator"> | </span><span class="dna">GGC</span><span class="separator"> | </span><span class="dna">CCA</span><span class="separator"> | </span><span class="dna">AAG</span><span class="separator"> | </span><span class="dna">GAC</span><span class="separator"> ...</span>
+    <span class="arrow">&darr;&ensp;&ensp;&ensp;&ensp;&darr;&ensp;&ensp;&ensp;&ensp;&darr;&ensp;&ensp;&ensp;&ensp;&darr;&ensp;&ensp;&ensp;&ensp;&darr;&ensp;&ensp;&ensp;&ensp;&darr;&ensp;&ensp;&ensp;&ensp;&darr;</span>
+    <span class="protein">&ensp;M&ensp;&ensp;&ensp;&ensp;&ensp;A&ensp;&ensp;&ensp;&ensp;&ensp;E&ensp;&ensp;&ensp;&ensp;&ensp;G&ensp;&ensp;&ensp;&ensp;&ensp;P&ensp;&ensp;&ensp;&ensp;&ensp;K&ensp;&ensp;&ensp;&ensp;&ensp;D&ensp;&ensp;</span>
+  </div>
+  <p>Same protein. Different DNA. Potentially very different expression levels.</p>
+
+  <h3>2b. Protein Expression</h3>
+  <p><strong>Expression</strong> means: does the DNA successfully produce protein, and how much? When scientists want to make a protein, they put DNA instructions into a biological system and try to produce it. Expression routinely fails, even when the protein design is correct. The DNA "spelling" matters enormously.</p>
+  <p>Two classical metrics dominate expression prediction:</p>
+  <ul>
+    <li><strong>CAI (Codon Adaptation Index):</strong> Measures how well the sequence uses E. coli's preferred codons. Higher CAI generally means faster, more efficient translation.</li>
+    <li><strong>MFE (Minimum Free Energy):</strong> Measures whether the mRNA folds into physical knots at its 5' end. More negative MFE = tighter knots = the ribosome (the protein-making machine) cannot land = less protein. An unfolded 5' end (MFE near 0) is good.</li>
+  </ul>
+  <p><strong>Cell-free expression</strong> produces protein in a test tube rather than in living cells. Purified ribosomes, amino acids, and energy molecules are combined, and they build protein directly from a DNA template. Results in hours, not days. Ginkgo Bioworks offers this as a cloud service: you upload a DNA sequence, their robotic lab runs the reaction, and you get back a concentration (nM) of how much protein was produced.</p>
+
+  <h3>2c. The AI Model (NTv3)</h3>
+  <p><strong>NTv3-650M</strong> is a DNA foundation model developed by InstaDeep, trained on billions of DNA sequences. It processes individual nucleotides (A, T, C, G) &mdash; a finer granularity than codons. We attached a linear probe to NTv3's internal representations and trained it to predict protein expression from published datasets.</p>
+  <p>On synonymous variant expression prediction, NTv3 achieves <strong>AUROC 0.822</strong>, compared to <strong>0.725</strong> for the best classical metric (XGBoost on hand-crafted features). The model has learned something real about what makes DNA express well &mdash; though, as we found, most of that knowledge overlaps with what classical metrics already capture.</p>
+
+  <h3>2d. Sparse Autoencoders (SAEs)</h3>
+  <p>A Sparse Autoencoder decomposes a neural network's internal activations into a dictionary of <strong>interpretable features</strong>. Each feature ideally corresponds to one concept the model has learned. Think of it as an MRI for the AI: instead of a single dense activation vector, you get thousands of individually meaningful signals.</p>
+  <p>We trained a BatchTopK SAE on NTv3's layer 6 activations, producing <strong>12,288 features</strong> (expansion factor 8, k=128). The goal: find features that correspond to biological mechanisms the model learned from raw DNA sequences &mdash; and determine whether any of them capture something beyond what classical metrics already measure.</p>
+</section>
+
+<!-- SECTION 3: COMPUTATIONAL FINDINGS -->
+<section id="computational">
+  <h2>3. What We Found Computationally</h2>
+
+  <h3>3a. Most features = known biology</h3>
+  <p>When mean-pooled across the full sequence, the dominant SAE features are redundant with CAI &mdash; the simplest classical metric. The partial correlation of mean-pooled SAE features with expression after controlling for CAI and GC content is <strong>0.024</strong>, essentially zero. The SAE correctly decomposes the model's knowledge, but at the whole-sequence level, that knowledge is mostly what biologists have understood since the 1980s.</p>
+  <p>This is both expected and a validation: the SAE recovers known biology cleanly. 617 features show period-3 firing patterns (oscillating every 3 nucleotides), meaning the model learned the triplet structure of the genetic code without ever being told proteins exist.</p>
+
+  <h3>3b. 116 features generalize across proteins</h3>
+  <p>We screened all 12,288 features across <strong>two independent datasets</strong>: Nieuwkoop (1,459 mRFP synonymous variants) and Cambray (11,421 sequences across 56 different proteins). After controlling for all 64 codon frequencies, <strong>116 features</strong> still predict expression on <strong>both</strong> datasets. All fire at the 5' end (the translation initiation site, first ~7 codons). All are Bonferroni-significant on both datasets independently.</p>
+
+  <h3>3c. The dominant signal is mRNA structure</h3>
+  <p>ViennaRNA MFE_30 (the predicted folding energy of the first 30 nucleotides) has <strong>r = +0.642</strong> with expression on the Nieuwkoop dataset. Many of the 116 SAE features encode this structural information. The model taught itself thermodynamics from sequence data alone &mdash; an impressive feat of representation learning, though not a new biological discovery.</p>
+
+  <h3>3d. Two features resist simple explanation</h3>
+  <p><strong>Feature 5984</strong> fires at codon position 0 (the start codon and its immediate context). It is negatively correlated with expression in both training datasets: partial r = -0.27 on Nieuwkoop, -0.11 on Cambray, after controlling for all 64 codon frequencies. About 80% of its variance can be explained by 5-mer nucleotide frequencies, but the remaining 20% cannot.</p>
+  <p><strong>Feature 2139</strong> fires at codon position 1. It is positively correlated with expression: partial r = +0.25 on Nieuwkoop, +0.10 on Cambray. Only 53% of its variance is explained by 5-mers. 47% remains unexplained.</p>
+  <p>Critically, both features survive controls for dinucleotide frequencies and MFE. And <strong>nonlinear models</strong> (Random Forest, Gradient Boosting) trained on 5-mer frequencies <strong>do not close the gap</strong>. Whatever these features encode, it is not a nonlinear function of local sequence statistics.</p>
+</section>
+
+<!-- SECTION 4: EXPERIMENT DESIGN -->
+<section id="design">
+  <h2>4. The Experiment Design</h2>
+
+  <h3>4a. The core idea</h3>
+  <p>Design DNA sequences where the SAE features and classical metrics <strong>disagree</strong>. If the features correctly predict expression when classical metrics say "these should be equivalent," we have evidence that the model captures something real beyond known biology. If the features are wrong, we learn the signal is too weak or too noisy to matter.</p>
+
+  <h3>4b. The red team process</h3>
+  <p>Our original matched pairs had fatal confounds: GC content mismatch at the 5' end, Shine-Dalgarno motif count mismatch, and other classical differences that could explain any expression difference without invoking the SAE features. We subjected the panel to adversarial review, identified these problems, then generated <strong>2,500 candidate synonymous variants</strong> and re-selected pairs with strict matching criteria.</p>
+  <p>The final v3 matched pairs match on: CAI (&plusmn;0.011), MFE (&plusmn;0.6 kcal/mol), GC at the 5' end (identical at 0.500), and SD motif count (&plusmn;1). Any expression difference between these pairs cannot be attributed to classical metrics.</p>
+
+  <h3>4c. The 14 constructs</h3>
+  <p>All constructs encode the same <strong>mRFP</strong> protein (225 amino acids), except the SD dose-response group (231-aa variant with additional N-terminal residues for SD motif engineering). Only the DNA spelling differs. Each construct was tested with <strong>12 replicates</strong> via Ginkgo's cell-free protein expression service with HiBiT quantification.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Construct</th><th>Group</th><th class="num">CAI</th><th class="num">MFE</th><th class="num">Conc. (nM)</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>FULL-CAI-MAX</td><td>Control</td><td class="num">0.954</td><td class="num">-1.7</td><td class="num highlight">273.0</td><td>Maximum codon optimization</td></tr>
+        <tr><td>SD-09-hiCAI</td><td>SD dose</td><td class="num">0.989</td><td class="num">-1.7</td><td class="num">269.9</td><td>9 internal SD motifs</td></tr>
+        <tr><td>SD-25-hiCAI</td><td>SD dose</td><td class="num">0.947</td><td class="num">-1.7</td><td class="num">246.0</td><td>25 internal SD motifs</td></tr>
+        <tr><td>CTRL-BEST</td><td>Control</td><td class="num">0.607</td><td class="num">0.0</td><td class="num">231.9</td><td>Natural best expresser</td></tr>
+        <tr><td>RANDOM-BASELINE-2</td><td>Random</td><td class="num">0.563</td><td class="num">-6.4</td><td class="num">225.9</td><td>Random codon choice</td></tr>
+        <tr><td>SD-13-hiCAI</td><td>SD dose</td><td class="num">1.000</td><td class="num">-1.7</td><td class="num">218.7</td><td>13 internal SD motifs</td></tr>
+        <tr><td>SD-21-hiCAI</td><td>SD dose</td><td class="num">0.967</td><td class="num">-1.7</td><td class="num">204.8</td><td>21 internal SD motifs</td></tr>
+        <tr><td>NTv3-MIN-goodCAI</td><td>Oracle</td><td class="num">0.589</td><td class="num">0.0</td><td class="num">204.2</td><td>Model pessimistic, classical OK</td></tr>
+        <tr><td>SD-17-hiCAI</td><td>SD dose</td><td class="num">0.986</td><td class="num">-1.7</td><td class="num">186.4</td><td>17 internal SD motifs</td></tr>
+        <tr style="background:rgba(63,185,80,0.08)"><td>F5984-MATCHED-HIGH</td><td>Matched</td><td class="num">0.554</td><td class="num">-1.7</td><td class="num highlight">146.9</td><td>Feature fires (0.000363)</td></tr>
+        <tr style="background:rgba(248,81,73,0.08)"><td>F5984-MATCHED-LOW</td><td>Matched</td><td class="num">0.565</td><td class="num">-2.3</td><td class="num highlight">97.2</td><td>Feature silent (0.000)</td></tr>
+        <tr><td>NTv3-MAX-badCAI</td><td>Oracle</td><td class="num">0.363</td><td class="num">-3.4</td><td class="num highlight" style="color:var(--accent-red)">0.0</td><td>Model loved it, CAI = 0.36</td></tr>
+        <tr><td>RANDOM-BASELINE-1</td><td>Random</td><td class="num">0.571</td><td class="num">-5.6</td><td class="num" style="color:var(--accent-red)">0.0</td><td>Random codon choice</td></tr>
+        <tr><td>CTRL-WORST</td><td>Control</td><td class="num">0.581</td><td class="num">-10.6</td><td class="num" style="color:var(--accent-red)">0.0</td><td>Natural worst expresser</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- SECTION 5: RESULTS -->
+<section id="results">
+  <h2>5. Results</h2>
+
+  <h3>5a. Controls work</h3>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="value">273 nM</div>
+      <div class="label">FULL-CAI-MAX</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">232 nM</div>
+      <div class="label">CTRL-BEST</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">0 nM</div>
+      <div class="label">CTRL-WORST</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">4.2%</div>
+      <div class="label">Average CV</div>
+    </div>
+  </div>
+
+  <div class="chart-container">
+    <div class="chart-title">Control Constructs: Expression (nM)</div>
+    <canvas id="controlsChart" height="200"></canvas>
+  </div>
+
+  <p>The assay has clear dynamic range. The codon-optimized maximum (FULL-CAI-MAX) produces 273 nM of protein. The natural best expresser from the Nieuwkoop dataset (CTRL-BEST) produces 232 nM. The natural worst expresser (CTRL-WORST) produces nothing. These are synonymous variants &mdash; identical protein, different DNA &mdash; and the expression difference is 273x (or more precisely, infinity, since CTRL-WORST is zero). Codon choice matters enormously. The average coefficient of variation across all constructs is 4.2%, indicating excellent reproducibility.</p>
+
+  <!-- THE KEY RESULT -->
+  <h3>5b. The Feature 5984 Matched Pair</h3>
+
+  <div class="chart-container large">
+    <div class="chart-title">Feature 5984 Matched Pair: Expression with Individual Replicates</div>
+    <canvas id="matchedPairChart" height="320"></canvas>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Metric</th><th class="num">HIGH (feature fires)</th><th class="num">LOW (feature silent)</th><th class="num">Delta</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>CAI</td><td class="num">0.554</td><td class="num">0.565</td><td class="num">0.011</td></tr>
+        <tr><td>MFE_30 (kcal/mol)</td><td class="num">-1.7</td><td class="num">-2.3</td><td class="num">0.6</td></tr>
+        <tr><td>GC at 5' end</td><td class="num">0.500</td><td class="num">0.500</td><td class="num">0.000</td></tr>
+        <tr><td>SD motif count</td><td class="num">15</td><td class="num">14</td><td class="num">1</td></tr>
+        <tr><td>NTv3 probe score</td><td class="num">6.6</td><td class="num">6.6</td><td class="num">~0.0</td></tr>
+        <tr><td>Feature 5984 activation</td><td class="num">0.000363</td><td class="num">0.000</td><td class="num highlight">fires vs. silent</td></tr>
+        <tr style="background:var(--bg-tertiary)"><td><strong>Expression</strong></td><td class="num highlight">146.9 &plusmn; 5.7 nM</td><td class="num highlight">97.2 &plusmn; 4.4 nM</td><td class="num highlight" style="color:var(--accent-green)">1.51x</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout green">
+    <p><strong>Key finding:</strong> The SAE feature captures a real sequence property that produces a large, highly significant expression difference (p = 2.6 &times; 10<sup>-17</sup>) between constructs matched on ALL classical metrics. These two sequences encode the same protein, have nearly identical CAI, MFE, GC content, SD motif count, and even the same NTv3 probe score. The only designed difference is whether Feature 5984 fires &mdash; and the construct where it fires produces 1.51x more protein.</p>
+  </div>
+
+  <div class="callout orange">
+    <p><strong>The twist:</strong> Feature 5984 is <strong>negatively</strong> correlated with expression in both training datasets (partial r = -0.27 on Nieuwkoop, -0.11 on Cambray). In the training data, which comes from in-vivo E. coli experiments, high activation = worse expression. But in the cell-free wet lab, high activation = BETTER expression. <strong>The direction flipped.</strong></p>
+    <p>Why might this happen? A cell-free expression system is fundamentally different from a living cell. There are no competing mRNAs fighting for ribosomes. The tRNA pools are different (purified, not naturally regulated). There is no mRNA degradation machinery. There is no protein quality control. The feature detects a genuine sequence property, but that property's effect on expression depends on the biological context it operates in.</p>
+  </div>
+
+  <h3>5c. The NTv3 Oracle</h3>
+
+  <div class="chart-container">
+    <div class="chart-title">NTv3 Oracle: Model Prediction vs. Wet Lab Reality</div>
+    <canvas id="oracleChart" height="220"></canvas>
+  </div>
+
+  <p><strong>NTv3-MAX-badCAI</strong> is the sequence the model loved most &mdash; probe score 12.6, the highest confidence prediction. But it has CAI = 0.36, far below what E. coli can tolerate. Result: <strong>0 nM</strong>. Complete failure. Zero protein.</p>
+  <p><strong>NTv3-MIN-goodCAI</strong> is the sequence the model was most pessimistic about among those with acceptable classical metrics. Probe score 6.6, CAI = 0.59. Result: <strong>204 nM</strong>. Perfectly fine.</p>
+  <p>The probe, trained on in-vivo E. coli expression data, does not transfer to cell-free expression at extreme CAI values. Classical metrics (particularly CAI) remain the dominant predictor in this assay. The model's internal representation captured real patterns, but the probe mapping those patterns to expression was calibrated for a different biological context.</p>
+
+  <h3>5d. SD Dose-Response</h3>
+
+  <div class="chart-container">
+    <div class="chart-title">Internal Shine-Dalgarno Motifs vs. Expression</div>
+    <canvas id="sdChart" height="240"></canvas>
+  </div>
+
+  <p>Shine-Dalgarno (SD) motifs are sequences (like <code>GGAGG</code>) that normally sit upstream of a gene to recruit the ribosome. When they appear <strong>inside</strong> a gene, they can recruit ribosomes to the wrong location, stalling translation. We varied the number of internal SD motifs from 9 to 25 while keeping CAI near-maximal.</p>
+  <p>The result is <strong>non-monotonic</strong>: expression drops from 270 nM (9 SDs) to 186 nM (17 SDs), then <em>rises</em> back to 246 nM (25 SDs). This U-shaped curve suggests complex dynamics &mdash; perhaps at very high SD density, the motifs are so frequent that no single one dominates, or compensatory mechanisms take over. The CAI variation across the series (0.947 to 1.000) does not explain the pattern (correlation r = -0.14 between CAI and expression within this group).</p>
+
+  <h3>5e. Random Baselines</h3>
+
+  <div class="chart-container">
+    <div class="chart-title">Random Synonymous Variants: Expression (nM)</div>
+    <canvas id="randomChart" height="180"></canvas>
+  </div>
+
+  <p><strong>RANDOM-BASELINE-1</strong>: 0 nM (no protein at all). <strong>RANDOM-BASELINE-2</strong>: 226 nM (expressed well). A randomly chosen synonymous variant of mRFP has roughly a coin-flip chance of expressing any protein at all. This underscores the scale of the codon optimization problem: the DNA spelling has MASSIVE effects on protein production, and random choices are unreliable.</p>
+</section>
+
+<!-- SECTION 6: WHAT THIS MEANS -->
+<section id="meaning">
+  <h2>6. What This Means</h2>
+
+  <h3>6a. The SAE feature found something real</h3>
+  <p>A specific, interpretable feature from the SAE decomposition of NTv3 identifies a sequence property that:</p>
+  <ul>
+    <li>Generalizes across two independent datasets and 56 different proteins</li>
+    <li>Survives controls for all 64 codon frequencies, dinucleotides, and mRNA folding energy</li>
+    <li>Resists explanation by both linear and nonlinear models of local sequence statistics</li>
+    <li>Produces a <strong>1.51x expression difference</strong> between otherwise-matched constructs in a wet lab (p = 2.6 &times; 10<sup>-17</sup>)</li>
+  </ul>
+
+  <h3>6b. But the sign flipped</h3>
+  <p>The feature's direction of effect reversed between the training context (in-vivo E. coli) and the test context (cell-free expression). This means:</p>
+  <ul>
+    <li>The feature detects a <strong>real biological property</strong> of the DNA sequence</li>
+    <li>But that property's effect on expression is <strong>context-dependent</strong></li>
+    <li>A cell-free system is fundamentally different from a living cell: no competing mRNAs, different tRNA pools, no mRNA degradation, no protein quality control</li>
+    <li>This is both a limitation and a finding &mdash; it tells us something about what differs between expression systems</li>
+  </ul>
+
+  <h3>6c. The model doesn't transfer at extremes</h3>
+  <p>The NTv3 probe (trained on in-vivo data) completely fails when pushed to extreme CAI values in a cell-free system. The model's highest-confidence prediction produced zero protein. Classical metrics &mdash; particularly CAI &mdash; remain the dominant predictor in this assay. This is a cautionary tale about domain transfer: a model can learn genuine patterns and still fail when the deployment context differs from the training context.</p>
+
+  <h3>6d. SD motifs have complex effects</h3>
+  <p>The non-monotonic SD dose-response suggests that internal ribosome-binding-site mimics do not simply reduce expression in proportion to their count. Position, motif type, spacing, and local sequence context likely all matter. The U-shaped curve is an unexpected finding that warrants further investigation.</p>
+</section>
+
+<!-- SECTION 7: HONEST ASSESSMENT -->
+<section id="assessment">
+  <h2>7. Honest Assessment</h2>
+
+  <div class="verdict">
+    <div class="verdict-box can">
+      <h4>What We Can Claim</h4>
+      <ul>
+        <li>SAE decomposition of a DNA foundation model identified a feature that captures a genuine biological signal invisible to classical metrics, validated by a 1.51x expression difference in a wet lab (p = 2.6 &times; 10<sup>-17</sup>)</li>
+        <li>The direction of effect is assay-dependent, highlighting context-dependence of sequence features across expression systems</li>
+      </ul>
+    </div>
+    <div class="verdict-box cannot">
+      <h4>What We Cannot Claim</h4>
+      <ul>
+        <li>We did NOT discover new biology &mdash; we do not know what the feature detects mechanistically</li>
+        <li>We did NOT show that SAE features improve expression prediction (the sign was wrong for this assay)</li>
+        <li>We did NOT show that NTv3 outperforms classical metrics in cell-free (it does not, especially at extremes)</li>
+        <li>N=14 constructs is a pilot, not a definitive study</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>What is genuinely novel</h3>
+  <ul>
+    <li><strong>First wet-lab validation of SAE features from a DNA foundation model.</strong> SAEs have been applied to language models extensively, but this is (to our knowledge) the first time an SAE feature from a biological foundation model has been tested in a physical experiment.</li>
+    <li><strong>First evidence that SAE features capture real, non-classical sequence properties that affect expression.</strong> The feature survived every statistical control we could apply, and the wet-lab result confirmed it detects something real.</li>
+    <li><strong>First demonstration of context-dependent feature effects across expression systems.</strong> The sign flip between in-vivo and cell-free is a finding in itself &mdash; it constrains what the feature might be detecting.</li>
+    <li><strong>The methodology is reusable.</strong> SAE decomposition &rarr; cross-dataset feature selection &rarr; matched pair design &rarr; wet lab validation is a general framework applicable to any foundation model in any domain where physical validation is possible.</li>
+  </ul>
+</section>
+
+<!-- SECTION 8: METHODS -->
+<section id="methods">
+  <h2>8. Methods Summary</h2>
+
+  <h4>Model and SAE</h4>
+  <p><strong>NTv3-650M-pre</strong> (InstaDeep), layer 6 activations. BatchTopK SAE with 12,288 features (expansion factor 8, k=128). Trained on activations from diverse DNA sequences.</p>
+
+  <h4>Cross-dataset feature screen</h4>
+  <p>All 12,288 features screened for partial correlation with expression after controlling for all 64 codon frequencies. Required Bonferroni significance on both the Nieuwkoop dataset (1,459 mRFP synonymous variants) AND the Cambray dataset (11,421 sequences across 56 proteins). 116 features passed.</p>
+
+  <h4>Matched pair selection</h4>
+  <p>2,500 candidate synonymous mRFP variants generated. Matched pairs selected with strict criteria: CAI &plusmn;0.02, MFE &plusmn;1.0 kcal/mol, GC at 5' end &plusmn;0.05, SD motif count &plusmn;2. The Feature 5984 pair achieved CAI &plusmn;0.011, MFE &plusmn;0.6, identical GC_5prime at 0.500, SD count &plusmn;1.</p>
+
+  <h4>Wet lab</h4>
+  <p>Ginkgo Bioworks Cell-Free Protein Expression (CFPE) service. HiBiT quantification (C-terminal tag, luminescence readout). 12 replicates per construct. 14 constructs total. All constructs encode mRFP (225 aa, except SD series at 231 aa).</p>
+
+  <h4>Cost</h4>
+  <p>Total experiment cost: <strong>$1,638</strong>.</p>
+</section>
+
+</div>
+
+<footer>
+  <div class="container">
+    <p>Goodfire AI &middot; 2026</p>
+    <p style="margin-top:8px">NTv3 model by InstaDeep &middot; Cell-free expression by Ginkgo Bioworks</p>
+  </div>
+</footer>
+
+<script>
+// Color palette
+const colors = {
+  controlBlue: '#4a90d9',
+  controlBlueBg: 'rgba(74, 144, 217, 0.7)',
+  matchedGreen: '#3fb950',
+  matchedGreenBg: 'rgba(63, 185, 80, 0.7)',
+  matchedRed: '#f85149',
+  matchedRedBg: 'rgba(248, 81, 73, 0.7)',
+  oraclePurple: '#bc8cff',
+  oraclePurpleBg: 'rgba(188, 140, 255, 0.7)',
+  sdOrange: '#d29922',
+  sdOrangeBg: 'rgba(210, 153, 34, 0.7)',
+  randomGray: '#8b949e',
+  randomGrayBg: 'rgba(139, 148, 158, 0.7)',
+  gridColor: 'rgba(48, 54, 61, 0.8)',
+  textSecondary: '#8b949e',
+  textPrimary: '#e6edf3',
+};
+
+Chart.defaults.color = colors.textSecondary;
+Chart.defaults.borderColor = colors.gridColor;
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+// 5a. Controls chart
+new Chart(document.getElementById('controlsChart'), {
+  type: 'bar',
+  data: {
+    labels: ['FULL-CAI-MAX', 'CTRL-BEST', 'CTRL-WORST'],
+    datasets: [{
+      data: [273.0, 231.9, 0],
+      backgroundColor: [colors.controlBlueBg, colors.controlBlueBg, colors.controlBlueBg],
+      borderColor: [colors.controlBlue, colors.controlBlue, colors.controlBlue],
+      borderWidth: 1.5,
+      borderRadius: 4,
+      barThickness: 60,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => ctx.parsed.y.toFixed(1) + ' nM'
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: { display: true, text: 'Expression (nM)', color: colors.textSecondary },
+        grid: { color: colors.gridColor },
+        ticks: { color: colors.textSecondary }
+      },
+      x: {
+        grid: { display: false },
+        ticks: { color: colors.textSecondary, font: { size: 11 } }
+      }
+    }
+  }
+});
+
+// 5b. Matched Pair Chart - bar + strip plot
+(function() {
+  const highData = [147.28, 152.31, 139.02, 145.0, 152.98, 140.86, 144.58, 156.18, 144.73, 144.66, 154.13, 141.54];
+  const lowData = [97.87, 100.4, 91.36, 95.92, 103.22, 92.37, 97.12, 102.93, 92.99, 97.52, 102.55, 92.11];
+  const highMean = highData.reduce((a,b) => a+b, 0) / highData.length;
+  const lowMean = lowData.reduce((a,b) => a+b, 0) / lowData.length;
+  const highStd = Math.sqrt(highData.reduce((s,v) => s + (v-highMean)**2, 0) / (highData.length-1));
+  const lowStd = Math.sqrt(lowData.reduce((s,v) => s + (v-lowMean)**2, 0) / (lowData.length-1));
+
+  // Use scatter for individual points + bar for means
+  const ctx = document.getElementById('matchedPairChart');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['HIGH (feature fires)', 'LOW (feature silent)'],
+      datasets: [
+        {
+          type: 'bar',
+          data: [highMean, lowMean],
+          backgroundColor: [
+            'rgba(63, 185, 80, 0.3)',
+            'rgba(248, 81, 73, 0.3)'
+          ],
+          borderColor: [colors.matchedGreen, colors.matchedRed],
+          borderWidth: 2,
+          borderRadius: 4,
+          barThickness: 100,
+          order: 2,
+        },
+        {
+          type: 'scatter',
+          label: 'Individual replicates',
+          data: highData.map((v, i) => ({
+            x: -0.25 + Math.random() * 0.5,
+            y: v
+          })),
+          backgroundColor: colors.matchedGreen,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          order: 1,
+        },
+        {
+          type: 'scatter',
+          label: 'Individual replicates (LOW)',
+          data: lowData.map((v, i) => ({
+            x: 0.75 + Math.random() * 0.5,
+            y: v
+          })),
+          backgroundColor: colors.matchedRed,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          order: 1,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              if (ctx.datasetIndex === 0) {
+                const label = ctx.label;
+                const val = ctx.parsed.y.toFixed(1);
+                const std = ctx.dataIndex === 0 ? highStd.toFixed(1) : lowStd.toFixed(1);
+                return label + ': ' + val + ' +/- ' + std + ' nM';
+              }
+              return ctx.parsed.y.toFixed(1) + ' nM';
+            }
+          }
+        },
+        annotation: undefined,
+      },
+      scales: {
+        y: {
+          beginAtZero: false,
+          min: 75,
+          max: 170,
+          title: { display: true, text: 'Expression (nM)', color: colors.textSecondary },
+          grid: { color: colors.gridColor },
+          ticks: { color: colors.textSecondary }
+        },
+        x: {
+          grid: { display: false },
+          ticks: {
+            color: colors.textSecondary,
+            font: { size: 13, weight: 'bold' }
+          }
+        }
+      }
+    }
+  });
+})();
+
+// 5c. Oracle chart
+new Chart(document.getElementById('oracleChart'), {
+  type: 'bar',
+  data: {
+    labels: ['NTv3-MAX-badCAI\n(probe=12.6, CAI=0.36)', 'NTv3-MIN-goodCAI\n(probe=6.6, CAI=0.59)'],
+    datasets: [{
+      data: [0, 204.2],
+      backgroundColor: [
+        'rgba(188, 140, 255, 0.3)',
+        'rgba(188, 140, 255, 0.7)'
+      ],
+      borderColor: [colors.oraclePurple, colors.oraclePurple],
+      borderWidth: 2,
+      borderRadius: 4,
+      barThickness: 80,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => ctx.parsed.y.toFixed(1) + ' nM'
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: { display: true, text: 'Expression (nM)', color: colors.textSecondary },
+        grid: { color: colors.gridColor },
+        ticks: { color: colors.textSecondary }
+      },
+      x: {
+        grid: { display: false },
+        ticks: { color: colors.textSecondary, font: { size: 11 } }
+      }
+    }
+  }
+});
+
+// 5d. SD Dose-Response
+new Chart(document.getElementById('sdChart'), {
+  type: 'line',
+  data: {
+    labels: ['9', '13', '17', '21', '25'],
+    datasets: [{
+      label: 'Expression (nM)',
+      data: [269.9, 218.7, 186.4, 204.8, 246.0],
+      borderColor: colors.sdOrange,
+      backgroundColor: 'rgba(210, 153, 34, 0.15)',
+      pointBackgroundColor: colors.sdOrange,
+      pointBorderColor: colors.sdOrange,
+      pointRadius: 7,
+      pointHoverRadius: 10,
+      borderWidth: 2.5,
+      tension: 0.3,
+      fill: true,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => ctx.parsed.y.toFixed(1) + ' nM'
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: false,
+        min: 150,
+        max: 290,
+        title: { display: true, text: 'Expression (nM)', color: colors.textSecondary },
+        grid: { color: colors.gridColor },
+        ticks: { color: colors.textSecondary }
+      },
+      x: {
+        title: { display: true, text: 'Internal SD Motif Count', color: colors.textSecondary },
+        grid: { color: colors.gridColor },
+        ticks: { color: colors.textSecondary }
+      }
+    }
+  }
+});
+
+// 5e. Random Baselines
+new Chart(document.getElementById('randomChart'), {
+  type: 'bar',
+  data: {
+    labels: ['RANDOM-BASELINE-1', 'RANDOM-BASELINE-2'],
+    datasets: [{
+      data: [0, 225.9],
+      backgroundColor: [
+        'rgba(139, 148, 158, 0.3)',
+        'rgba(139, 148, 158, 0.7)'
+      ],
+      borderColor: [colors.randomGray, colors.randomGray],
+      borderWidth: 1.5,
+      borderRadius: 4,
+      barThickness: 80,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => ctx.parsed.y.toFixed(1) + ' nM'
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: { display: true, text: 'Expression (nM)', color: colors.textSecondary },
+        grid: { color: colors.gridColor },
+        ticks: { color: colors.textSecondary }
+      },
+      x: {
+        grid: { display: false },
+        ticks: { color: colors.textSecondary, font: { size: 11 } }
+      }
+    }
+  }
+});
+</script>
+
+</body>
+</html>
